@@ -11,6 +11,7 @@ JAVA21_HOME="${SDKMAN_DIR:-$HOME/.sdkman}/candidates/java/$JAVA21_VERSION"
 
 export SPRING_ADVISOR_MAPPING_CUSTOM_0_GIT_URI="https://github.com/dashaun-tanzu/advisor-mappings.git"
 export SPRING_ADVISOR_MAPPING_CUSTOM_0_GIT_PATH="mappings/"
+export SPRING_ADVISOR_MAPPING_CUSTOM_0_MERGE_STRATEGY=override
 
 check_dependency() {
   local cmd=$1
@@ -212,7 +213,7 @@ function downloadAdvisor {
   tar_file="${HOME}/.m2/repository/com/vmware/tanzu/spring/${artifact}/${ADVISOR_VERSION}/${artifact}-${ADVISOR_VERSION}.tar"
 
   displayMessage "Download Spring Application Advisor CLI ${ADVISOR_VERSION} (${artifact})"
-  pei "mvn -U -q dependency:get -Dartifact=com.vmware.tanzu.spring:${artifact}:${ADVISOR_VERSION}:tar -Dtransitive=false"
+  pei "mvn -q dependency:get -Dartifact=com.vmware.tanzu.spring:${artifact}:${ADVISOR_VERSION}:tar -Dtransitive=false"
   pei "tar -xf '${tar_file}' -C ."
   pei "./cli-binary/advisor --version"
 }
