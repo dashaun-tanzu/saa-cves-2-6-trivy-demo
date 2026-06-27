@@ -59,6 +59,11 @@ check_env_vars() {
 check_dependencies
 check_env_vars
 
+# Pre-warm the Trivy vulnerability DB once, before the demo starts, so the two
+# in-demo scans run with --skip-db-update and avoid a live network pull.
+echo "Pre-warming Trivy vulnerability database..."
+trivy --download-db-only --quiet
+
 [[ ! -d "./vendir/demo-magic" ]] && vendir sync
 . ./vendir/demo-magic/demo-magic.sh
 export TYPE_SPEED=100
@@ -124,12 +129,7 @@ function useJava21 {
 
 function cloneApp {
   displayMessage "Clone a Spring Boot 2.6 application"
-  pei "git clone https://github.com/dashaun/hello-spring-boot-2-6.git ./"
-}
-
-function springBootBuild {
-  displayMessage "Build the Spring Boot application"
-  pei "./mvnw -q clean package -DskipTests"
+  pei "git clone --depth 1 https://github.com/dashaun/hello-spring-boot-2-6.git ./"
 }
 
 function springBootStart {
@@ -147,35 +147,57 @@ function validateApp {
   pei "http :8080/actuator/health 2>/dev/null"
 }
 
+function appPid {
+  # Resolve the running app's JVM PID, retrying until it registers with jps.
+  # spring-boot:start can return before the forked JVM is visible, which left
+  # the PID empty when called immediately. Prints the PID, or nothing on timeout.
+  local name=${1:-HelloSpringApplication}
+  local attempts=${2:-60}
+  local pid=""
+  for ((i = 0; i < attempts; i++)); do
+    pid=$(jps | grep "$name" | cut -d ' ' -f 1)
+    if [[ -n "$pid" ]]; then
+      echo "$pid"
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
 function showMemoryUsage {
   local pid=$1
   local log_file=$2
+
+  if [[ -z "$pid" ]]; then
+    echo "Could not find a running application process to measure"
+    echo "0" >> "$log_file"
+    return 1
+  fi
+
   local rss
   rss=$(ps -o rss= "$pid" | tail -n1)
+  if [[ -z "$rss" ]]; then
+    echo "Could not read memory for PID ${pid}"
+    echo "0" >> "$log_file"
+    return 1
+  fi
+
   local mem_usage
   mem_usage=$(bc <<< "scale=1; ${rss}/1024")
   echo "The process was using ${mem_usage} megabytes"
   echo "${mem_usage}" >> "$log_file"
 }
 
-function startCVECheckBackground {
+function runCVECheck {
   local log_file=$1
 
-  # Extract the CycloneDX SBOM that advisor wrote into build-config.json to a path
-  # outside target/, so it survives the upcoming `mvn clean` in springBootBuild.
+  # Extract the CycloneDX SBOM that advisor wrote into build-config.json to a
+  # standalone file for Trivy to scan.
   jq '.sbom' target/.advisor/build-config.json > sbom-cdx.json
 
-  displayMessage "Scanning advisor's CycloneDX SBOM with Trivy in the background..."
-  displayMessage "trivy sbom --quiet --format json --scanners vuln sbom-cdx.json"
-  trivy sbom --quiet --format json --scanners vuln sbom-cdx.json > trivy-report.json 2> trivy-check.log &
-  CVE_CHECK_PID=$!
-  disown $CVE_CHECK_PID
-}
-
-function collectCVECount {
-  local log_file=$1
-  displayMessage "Collecting Trivy results..."
-  wait "$CVE_CHECK_PID"
+  displayMessage "Scanning advisor's CycloneDX SBOM with Trivy..."
+  pei "trivy sbom --skip-db-update --quiet --format json --scanners vuln sbom-cdx.json > trivy-report.json 2> trivy-check.log"
   local cve_count
   cve_count=$(jq '[.Results[]?.Vulnerabilities[]?] | length' trivy-report.json)
   echo "Found ${cve_count} known CVEs"
@@ -224,11 +246,10 @@ function advisorBuildConfig {
 }
 
 function captureSBOMCount {
+  # Silently record the SBOM component count for the comparison table.
+  # The count is shown to the audience in showBuildConfigSBOMint, not here.
   local log_file=$1
-  local sbom_count
-  sbom_count=$(cat target/.advisor/build-config.json | jq '.sbom.components | length')
-  echo "SBOM component count: ${sbom_count}"
-  echo "${sbom_count}" > "$log_file"
+  cat target/.advisor/build-config.json | jq '.sbom.components | length' > "$log_file"
 }
 
 function showBuildConfigKeys {
@@ -265,7 +286,11 @@ function advisorUpgradePlanGet {
 
 function advisorUpgradePlanApplySquash {
   displayMessage "Do all the upgrades!"
-  pei "./cli-binary/advisor upgrade-plan apply --squash 10"
+  pei "./cli-binary/advisor upgrade-plan apply --squash 11"
+  # Silently pin 4.1.0-RC1 (if SAA landed on the release candidate) to the GA 4.1.0.
+  grep -rl --include='pom.xml' '4.1.0-RC1' . 2>/dev/null | while read -r f; do
+    sed -i.bak 's/4\.1\.0-RC1/4.1.0/g' "$f" && rm -f "$f.bak"
+  done
 }
 
 function displayMessage() {
@@ -301,7 +326,7 @@ function statsSoFarTableColored {
   PERCSTART2=$([ -n "$START2" ] && [ -n "$START1" ] && bc <<< "scale=2; 100 - ${START2}/${START1}*100" || echo "N/A")
   CVE2=$(cat java21with4.0.cves)
   DEPS2=$(cat java21with4.0.deps)
-  printf "${GREEN}%-35s %-25s %-10s %-10s %-15s %s ${NC}\n" "Spring Boot 4.0 with Java 21" "$START2 ($PERCSTART2% faster)" "$DEPS2" "$CVE2" "$MEM2" "$PERC2%"
+  printf "${GREEN}%-35s %-25s %-10s %-10s %-15s %s ${NC}\n" "Spring Boot 4.1 with Java 21" "$START2 ($PERCSTART2% faster)" "$DEPS2" "$CVE2" "$MEM2" "$PERC2%"
 
   echo -e "${WHITE}--------------------------------------------------------------------------------------------------------------${NC}"
   DEMO_STOP=$(date +%s)
@@ -325,7 +350,6 @@ talkingPoint
 advisorBuildConfig
 talkingPoint
 captureSBOMCount java8with2.6.deps
-talkingPoint
 showBuildConfigKeys
 talkingPoint
 showBuildConfigGitMetadata
@@ -336,19 +360,15 @@ showBuildConfigSubmodules
 talkingPoint
 showBuildConfigTools
 talkingPoint
-startCVECheckBackground java8with2.6.cves
-talkingPoint
-springBootBuild
+runCVECheck java8with2.6.cves
 talkingPoint
 springBootStart java8with2.6.log
 talkingPoint
 validateApp
 talkingPoint
-showMemoryUsage "$(jps | grep 'HelloSpringApplication' | cut -d ' ' -f 1)" java8with2.6.log2
+showMemoryUsage "$(appPid)" java8with2.6.log2
 talkingPoint
 springBootStop
-talkingPoint
-collectCVECount java8with2.6.cves
 talkingPoint
 advisorUpgradePlanGet
 talkingPoint
@@ -359,19 +379,14 @@ talkingPoint
 advisorBuildConfig
 talkingPoint
 captureSBOMCount java21with4.0.deps
-talkingPoint
-startCVECheckBackground java21with4.0.cves
-talkingPoint
-springBootBuild
+runCVECheck java21with4.0.cves
 talkingPoint
 springBootStart java21with4.0.log
 talkingPoint
 validateApp
 talkingPoint
-showMemoryUsage "$(jps | grep 'HelloSpringApplication' | cut -d ' ' -f 1)" java21with4.0.log2
+showMemoryUsage "$(appPid)" java21with4.0.log2
 talkingPoint
 springBootStop
-talkingPoint
-collectCVECount java21with4.0.cves
 talkingPoint
 statsSoFarTableColored
