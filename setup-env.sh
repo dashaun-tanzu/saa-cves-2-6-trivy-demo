@@ -31,7 +31,7 @@ fi
 echo "SDKMAN is installed"
 
 JAVA8_VERSION=$(grep '^java=8' .sdkmanrc | cut -d'=' -f2)
-JAVA21_VERSION=$(grep '^java=21' .sdkmanrc | cut -d'=' -f2)
+JAVA17_VERSION=$(grep '^java=17' .sdkmanrc | cut -d'=' -f2)
 
 echo ""
 echo "Checking Java versions..."
@@ -41,12 +41,12 @@ if ! sdk list java | grep -q "$JAVA8_VERSION"; then
     sdk install java "$JAVA8_VERSION"
 fi
 
-if ! sdk list java | grep -q "$JAVA21_VERSION"; then
-    echo "Installing Java $JAVA21_VERSION..."
-    sdk install java "$JAVA21_VERSION"
+if ! sdk list java | grep -q "$JAVA17_VERSION"; then
+    echo "Installing Java $JAVA17_VERSION..."
+    sdk install java "$JAVA17_VERSION"
 fi
 
-echo "Java $JAVA8_VERSION and Java $JAVA21_VERSION are installed"
+echo "Java $JAVA8_VERSION and Java $JAVA17_VERSION are installed"
 
 echo ""
 echo "Checking Trivy CLI..."

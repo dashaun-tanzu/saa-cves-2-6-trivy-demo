@@ -6,7 +6,7 @@ This interactive demo showcases the power of Spring Application Advisor (SAA) by
 
 ### What the Demo Does
 
-1. **Environment Setup**: Configures Java 8 and Java 21 environments using SDKMAN
+1. **Environment Setup**: Configures Java 8 and Java 17 environments using SDKMAN
 2. **Baseline Measurement**: Clones and runs a Spring Boot 2.6 application with Java 8, measuring:
    - Startup time
    - Memory usage
@@ -18,7 +18,7 @@ This interactive demo showcases the power of Spring Application Advisor (SAA) by
    - Tool versions
 4. **Automated Upgrade**: Generates and applies an upgrade plan that transforms the application to Spring Boot 4.0
 5. **Post-Upgrade Analysis**: Runs `advisor build-config get` again after the upgrade to capture the updated SBOM
-6. **Performance Validation**: Runs the upgraded application with Java 21 and measures the same metrics
+6. **Performance Validation**: Runs the upgraded application with Java 17 and measures the same metrics
 7. **Results Comparison**: Displays a side-by-side table showing:
    - Startup time (with % improvement)
    - Dependency count (from SBOM)
@@ -32,7 +32,7 @@ This interactive demo showcases the power of Spring Application Advisor (SAA) by
 - **Performance Gains**: Typically shows improvements in startup speed and memory efficiency
 - **Security Posture**: Demonstrates CVE reduction achieved by upgrading to a modern, supported version
 - **Dependency Insight**: SBOM comparison shows how the dependency footprint changes after upgrade
-- **Modern Java Features**: Leverages Java 21 optimizations and Spring Boot 4.x enhancements
+- **Modern Java Features**: Leverages Java 17 optimizations and Spring Boot 4.x enhancements
 
 ## Prerequisites
 

@@ -6,8 +6,8 @@ TEMP_DIR="upgrade-example"
 
 # Java version configuration — sourced from .sdkmanrc
 JAVA8_VERSION=$(grep '^java=8' "$(dirname "$0")/.sdkmanrc" | cut -d'=' -f2)
-JAVA21_VERSION=$(grep '^java=21' "$(dirname "$0")/.sdkmanrc" | cut -d'=' -f2)
-JAVA21_HOME="${SDKMAN_DIR:-$HOME/.sdkman}/candidates/java/$JAVA21_VERSION"
+JAVA17_VERSION=$(grep '^java=17' "$(dirname "$0")/.sdkmanrc" | cut -d'=' -f2)
+JAVA17_HOME="${SDKMAN_DIR:-$HOME/.sdkman}/candidates/java/$JAVA17_VERSION"
 
 export SPRING_ADVISOR_MAPPING_CUSTOM_0_GIT_URI="https://github.com/dashaun-tanzu/advisor-mappings.git"
 export SPRING_ADVISOR_MAPPING_CUSTOM_0_GIT_PATH="mappings/"
@@ -121,9 +121,9 @@ function useJava8 {
   pei "java -version"
 }
 
-function useJava21 {
-  displayMessage "Switch to Java 21 for Spring Boot 4"
-  pei "sdk use java $JAVA21_VERSION"
+function useJava17 {
+  displayMessage "Switch to Java 17 for Spring Boot 4"
+  pei "sdk use java $JAVA17_VERSION"
   pei "java -version"
 }
 
@@ -320,13 +320,13 @@ function statsSoFarTableColored {
   DEPS1=$(cat java8with2.6.deps)
   printf "${RED}%-35s %-25s %-10s %-10s %-15s %s${NC}\n" "Spring Boot 2.6 with Java 8" "$START1" "$DEPS1" "$CVE1" "$MEM1" "-"
 
-  MEM2=$(cat java21with4.0.log2)
+  MEM2=$(cat java17with4.0.log2)
   PERC2=$([ -n "$MEM2" ] && [ -n "$MEM1" ] && bc <<< "scale=2; 100 - ${MEM2}/${MEM1}*100" || echo "N/A")
-  START2=$(startupTime 'java21with4.0.log')
+  START2=$(startupTime 'java17with4.0.log')
   PERCSTART2=$([ -n "$START2" ] && [ -n "$START1" ] && bc <<< "scale=2; 100 - ${START2}/${START1}*100" || echo "N/A")
-  CVE2=$(cat java21with4.0.cves)
-  DEPS2=$(cat java21with4.0.deps)
-  printf "${GREEN}%-35s %-25s %-10s %-10s %-15s %s ${NC}\n" "Spring Boot 4.1 with Java 21" "$START2 ($PERCSTART2% faster)" "$DEPS2" "$CVE2" "$MEM2" "$PERC2%"
+  CVE2=$(cat java17with4.0.cves)
+  DEPS2=$(cat java17with4.0.deps)
+  printf "${GREEN}%-35s %-25s %-10s %-10s %-15s %s ${NC}\n" "Spring Boot 4.1 with Java 17" "$START2 ($PERCSTART2% faster)" "$DEPS2" "$CVE2" "$MEM2" "$PERC2%"
 
   echo -e "${WHITE}--------------------------------------------------------------------------------------------------------------${NC}"
   DEMO_STOP=$(date +%s)
@@ -372,20 +372,20 @@ springBootStop
 talkingPoint
 advisorUpgradePlanGet
 talkingPoint
-useJava21
+useJava17
 talkingPoint
 advisorUpgradePlanApplySquash
 talkingPoint
 advisorBuildConfig
 talkingPoint
-captureSBOMCount java21with4.0.deps
-runCVECheck java21with4.0.cves
+captureSBOMCount java17with4.0.deps
+runCVECheck java17with4.0.cves
 talkingPoint
-springBootStart java21with4.0.log
+springBootStart java17with4.0.log
 talkingPoint
 validateApp
 talkingPoint
-showMemoryUsage "$(appPid)" java21with4.0.log2
+showMemoryUsage "$(appPid)" java17with4.0.log2
 talkingPoint
 springBootStop
 talkingPoint
